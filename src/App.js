@@ -148,7 +148,7 @@ function App() {
               </Form.Group>
             </Form>
             }
-            <Button onClick={reset}>Reset</Button>
+            <Button onClick={reset} variant="danger">Reset</Button>
           </div>
       )}
     </div>
