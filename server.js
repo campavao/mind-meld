@@ -8,6 +8,10 @@ const io = new Server(server);
 
 app.use(express.static(path.resolve(__dirname, './build')));
 
+app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, './build', 'index.html'));
+});
+
 
 app.get('/api/game/:gameId', (req, res) => {
   res.json({ message: 'hello world'});
@@ -92,7 +96,7 @@ io.on('connection', (socket) => {
     })
 });
 
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3000;
 
 server.listen(port, () => {
   console.log('listening on *:', port);
