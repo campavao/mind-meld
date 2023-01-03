@@ -92,14 +92,14 @@ function App() {
   const sendWord = (e) => {
     e.preventDefault();
     const allWords = currentUser.words;
-    const word = e.target.form.word.value;
+    const word = e.target.word.value;
     if (allWords.includes(word)) {
       setErrorMsg('Word already guessed. Guess a different word.');
     } else {
       socket.emit('word', { word, gameId: currentGame.id, userId });
       setErrorMsg(undefined);
     }
-    e.target.form.word.value = '';
+    e.target.word.value = '';
   }
 
   const reset = (e) => {
@@ -138,13 +138,15 @@ function App() {
               );
             })}
             </div>
-            {!gameWon ? <Form>
-              <Form.Group className="mb-3" controlId="word">
-                <Form.Label>Word:</Form.Label>
-                <Form.Control as="input" rows={3} />
-                <Button onClick={sendWord} disabled={gameWon || (currentUser.words.length > 0 && currentUser.words.length === userTyping)}>Send</Button>
-              </Form.Group>
-            </Form> : <Button onClick={reset}>Reset</Button>}
+            {!gameWon ?
+              <Form onSubmit={sendWord}>
+                <Form.Group className="mb-3" controlId="word">
+                  <Form.Label>Word:</Form.Label>
+                  <Form.Control as="input" rows={3} />
+                  <Button type="submit" disabled={gameWon || (currentUser.words.length > 0 && currentUser.words.length === userTyping)}>Send</Button>
+                </Form.Group>
+              </Form>
+              : <Button onClick={reset}>Reset</Button>}
           </div>
       )}
     </div>
