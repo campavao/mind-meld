@@ -31,13 +31,17 @@ function App() {
       setCurrentGame({
         ...currentGame,
         ...game
-      })
+      });
+
+      if (gameWon) {
+        setGameWon(false);
+      }
     })
 
     return () => {
       socket.off('currentGame');
     };
-  }, [currentGame]);
+  }, [currentGame, gameWon]);
 
   useEffect(() => {
     socket.on('error', (error) => {
@@ -54,9 +58,7 @@ function App() {
     if (currentGame) {
       const userWords = [...currentGame.users].map(user => user.words.length);
       userWords.sort((a, b) => b - a);
-      console.log(userWords)
       const everyWordIsIn = userWords.every(val => val === userWords[0]);
-      console.log(everyWordIsIn, userWords[0])
       setUserTyping(!everyWordIsIn ? userWords[0] : false);
       if (everyWordIsIn && !userWords.every(val => val === 0)) {
         const everyFinalWord = currentGame.users.map(user => user.words[user.words.length - 1]);
@@ -89,8 +91,21 @@ function App() {
 
   const sendWord = (e) => {
     e.preventDefault();
-    socket.emit('word', { word: e.target.form.word.value, gameId: currentGame.id, userId });
+    const allWords = currentUser.words;
+    const word = e.target.form.word.value;
+    if (allWords.includes(word)) {
+      setErrorMsg('Word already guessed. Guess a different word.');
+    } else {
+      socket.emit('word', { word, gameId: currentGame.id, userId });
+      setErrorMsg(undefined);
+    }
     e.target.form.word.value = '';
+  }
+
+  const reset = (e) => {
+    e.preventDefault();
+    socket.emit('reset', currentGame.id);
+    setGameWon(false);
   }
 
   const currentUser = useMemo(() => currentGame?.users.find(user => user.id === userId) ?? {}, [currentGame])
@@ -123,13 +138,13 @@ function App() {
               );
             })}
             </div>
-            <Form>
+            {!gameWon ? <Form>
               <Form.Group className="mb-3" controlId="word">
                 <Form.Label>Word:</Form.Label>
                 <Form.Control as="input" rows={3} />
                 <Button onClick={sendWord} disabled={gameWon || (currentUser.words.length > 0 && currentUser.words.length === userTyping)}>Send</Button>
               </Form.Group>
-            </Form>
+            </Form> : <Button onClick={reset}>Reset</Button>}
           </div>
       )}
     </div>

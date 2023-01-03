@@ -41,20 +41,10 @@ const db = {
 io.on('connection', (socket) => {
   console.log('a user connected');
 
-    socket.on('ping', (msg) => {
-        io.emit('pong', msg)
-        console.log('pong -> ping');
-    });
-
-    socket.on('setUserId', (id) => {
-        console.log('new user', id);
-    });
-
     socket.on('create', (gameId, userInfo) => {
         if (db[gameId]) {
             io.emit('error', 'Game already exists');
         } else {
-            console.dir(db, { depth: null })
             db[gameId] = {
                 users: [userInfo],
                 id: gameId
@@ -79,24 +69,32 @@ io.on('connection', (socket) => {
     });
 
     socket.on('word', ({ word, gameId, userId }) => {
-        console.log('word, gameId, userId', word, gameId, userId);
         if (!db[gameId]) {
             console.warn('no game found for gameId: ', gameId)
             return;
         }
         const user = db[gameId]?.users.find(user => user.id === userId);
-        console.dir(user, { depth: null });
         user.words.push(word);
         socket.emit('currentGame', db[gameId]);
         io.to(gameId).emit('currentGame', db[gameId]);
     })
 
     socket.on('disconnect', (reason) => {
-        console.log(reason, socket.id, "disconnected")
+        console.log(reason, "disconnected")
+    })
+
+    socket.on('reset', (gameId) => {
+        console.log(socket.id, gameId);
+        db[gameId].users = db[gameId].users.map(user => ({
+            ...user,
+            words: []
+        }));
+        socket.emit('currentGame', db[gameId]);
+        socket.broadcast.emit('currentGame', db[gameId]);
     })
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 server.listen(port, () => {
   console.log('listening on *:', port);
