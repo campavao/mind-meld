@@ -1,0 +1,43 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  padding: 20px;
+
+  .row {
+    padding-top: 20px;
+  }
+
+  .users {
+    display: flex;
+
+    .user {
+      margin: 10px;
+      width: 100%;
+    }
+
+    // .user {
+    //   width: 100%;
+    //   background: white;
+    //   margin: 10px;
+    //   border: 5px solid gray;
+    //   border-radius: 15px;
+    //   position: relative;
+
+    //   .name {
+    //     background: gray;
+    //     color: white;
+    //     /* margin: -10px; */
+    //     height: 35px;
+    //     padding: 3px;
+    //   }
+
+    //   .word {
+    //     height: 35px;
+    //     border: 2px solid black;
+    //   }
+    // }
+  }
+}
+
