@@ -4,6 +4,12 @@
   justify-content: center;
   width: 100%;
   padding: 20px;
+  position: relative;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+  }
 
   .row {
     padding-top: 20px;
@@ -11,33 +17,13 @@
 
   .users {
     display: flex;
+    gap: 10px;
+    padding-bottom: 20px;
 
     .user {
-      margin: 10px;
       width: 100%;
     }
 
-    // .user {
-    //   width: 100%;
-    //   background: white;
-    //   margin: 10px;
-    //   border: 5px solid gray;
-    //   border-radius: 15px;
-    //   position: relative;
-
-    //   .name {
-    //     background: gray;
-    //     color: white;
-    //     /* margin: -10px; */
-    //     height: 35px;
-    //     padding: 3px;
-    //   }
-
-    //   .word {
-    //     height: 35px;
-    //     border: 2px solid black;
-    //   }
-    // }
   }
 }
 

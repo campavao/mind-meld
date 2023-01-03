@@ -70,7 +70,7 @@ function App() {
 
   const createGame = (e) => {
     e.preventDefault();
-    const gameId = uuid();
+    const gameId = uuid().substring(uuid().length - 4).toUpperCase();
     socket.emit('create', gameId, {
       id: userId,
       name: e.target.form.name.value,
@@ -112,22 +112,24 @@ function App() {
 
   return (
     <div className='container'>
-      <header>
-        <h1>Mind Meld</h1>
-        <p>Try to guess the same word!</p>
+      <header className='header'>
+        <div>
+          <h1>Mind Meld</h1>
+          <p>Try to guess the same word!</p>
+        </div>
+        {currentGame && <h2>Room code: {currentGame.id}</h2>}
       </header>
-      {gameWon && <h1>You won!</h1>}
+      {gameWon && <h1>You won! Got it in {currentUser.words.length}.</h1>}
       {errorMsg && <div className='error'>{errorMsg}</div>}
       {!currentGame ? (
 
         <Intro createGame={createGame} joinGame={joinGame} />
       ) : (
           <div>
-            <div>current game: {currentGame.id}</div>
             <div className="users">{currentGame.users.map(user => {
               return (
                 <Card key={user.id} className="user">
-                  <Card.Header>{user.name}</Card.Header>
+                  <Card.Header variant="dark">{user.name}</Card.Header>
                   <ListGroup variant="flush">
                     {user.words.map((word, index) => {
                       const listItem = index === userTyping - 1 ? '✔' : word;
@@ -138,15 +140,15 @@ function App() {
               );
             })}
             </div>
-            {!gameWon ?
-              <Form onSubmit={sendWord}>
-                <Form.Group className="mb-3" controlId="word">
-                  <Form.Label>Word:</Form.Label>
-                  <Form.Control as="input" rows={3} />
-                  <Button type="submit" disabled={gameWon || (currentUser.words.length > 0 && currentUser.words.length === userTyping)}>Send</Button>
-                </Form.Group>
-              </Form>
-              : <Button onClick={reset}>Reset</Button>}
+            {!gameWon &&
+            <Form onSubmit={sendWord}>
+              <Form.Group className="mb-3 d-flex align-items-center" controlId="word">
+                <Form.Control as="input" rows={3} placeholder="Guess" />
+                <Button type="submit" disabled={(currentGame.users.length === 1 || currentUser.words.length === userTyping)}>Send</Button>
+              </Form.Group>
+            </Form>
+            }
+            <Button onClick={reset}>Reset</Button>
           </div>
       )}
     </div>
@@ -165,8 +167,8 @@ function Intro({ createGame, joinGame }) {
           <Form.Control as="input" rows={3} />
         </Form.Group>
         <Form.Group controlId="create">
-          <Button variant="primary" size="lg" onClick={joinGame}>Join game</Button>
-          <Button variant="secondary" size="lg" onClick={createGame}>Create game</Button>
+        <Button variant="primary" className='mr-3' style={{ marginRight: '10px' }} size="lg" onClick={joinGame}>Join game</Button>
+          <Button variant="secondary" className='ml-3' size="lg" onClick={createGame}>Create game</Button>
         </Form.Group>
       </Form>
   );

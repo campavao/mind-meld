@@ -51,7 +51,6 @@ io.on('connection', (socket) => {
             };
             socket.join(gameId);
             io.to(gameId).emit('currentGame', db[gameId]);
-            // socket.emit('currentGame', db[gameId])
         }
     })
 
@@ -59,12 +58,15 @@ io.on('connection', (socket) => {
         if (!db[gameId]) {
             io.emit('error', 'Game does not exist');
         } else {
-            db[gameId].users.push(userInfo)
+            const existingUser = db[gameId].users.find(user => user.name === userInfo.name);
+            if (!existingUser) {
+                db[gameId].users.push(userInfo)
+            } else {
+                existingUser.id = userInfo.id;
+            }
             socket.emit('currentGame', db[gameId])
             socket.join(gameId);
             io.to(gameId).emit('currentGame', db[gameId]);
-
-            // socket.broadcast.emit('currentGame', db[gameId])
         }
     });
 
@@ -80,11 +82,10 @@ io.on('connection', (socket) => {
     })
 
     socket.on('disconnect', (reason) => {
-        console.log(reason, "disconnected")
+        console.log(reason, "disconnected");
     })
 
     socket.on('reset', (gameId) => {
-        console.log(socket.id, gameId);
         db[gameId].users = db[gameId].users.map(user => ({
             ...user,
             words: []
