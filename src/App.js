@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import _ from 'lodash';
 import io from 'socket.io-client';
 import { v4 as uuid } from 'uuid';
 
@@ -28,13 +29,17 @@ function App() {
 
   useEffect(() => {
     socket.on('currentGame', (game) => {
-      setCurrentGame({
-        ...currentGame,
-        ...game
-      });
+      if (!currentGame || game.users[userId]) {
+        setCurrentGame({
+          ...currentGame,
+          ...game
+        });
 
-      if (gameWon) {
-        setGameWon(false);
+        if (gameWon) {
+          setGameWon(false);
+        }
+      } else {
+        setCurrentGame(undefined);
       }
     })
 
@@ -46,7 +51,9 @@ function App() {
   useEffect(() => {
     socket.on('error', (error) => {
       console.warn(error)
-      setErrorMsg(error)
+      if (typeof error === 'string') {
+        setErrorMsg(error)
+      }
     })
 
     return () => {
@@ -56,12 +63,12 @@ function App() {
 
   useEffect(() => {
     if (currentGame) {
-      const userWords = [...currentGame.users].map(user => user.words.length);
-      userWords.sort((a, b) => b - a);
+      const userWords = _.orderBy([...Object.values(currentGame.users)], (user) => user.words.length, ['desc', 'asc'])
+        .map(user => user.words.length);
       const everyWordIsIn = userWords.every(val => val === userWords[0]);
       setUserTyping(!everyWordIsIn ? userWords[0] : false);
       if (everyWordIsIn && !userWords.every(val => val === 0)) {
-        const everyFinalWord = currentGame.users.map(user => user.words[user.words.length - 1]);
+        const everyFinalWord = Object.values(currentGame.users).map(user => user.words[user.words.length - 1]);
         const sameEveryWord = everyFinalWord.every(val => val === everyFinalWord[0]);
         setGameWon(sameEveryWord);
       }
@@ -70,8 +77,7 @@ function App() {
 
   const createGame = (e) => {
     e.preventDefault();
-    const gameId = uuid().substring(uuid().length - 4).toUpperCase();
-    socket.emit('create', gameId, {
+    socket.emit('create', {
       id: userId,
       name: e.target.form.name.value,
       words: []
@@ -92,11 +98,12 @@ function App() {
   const sendWord = (e) => {
     e.preventDefault();
     const allWords = currentUser.words;
-    const word = e.target.word.value;
+    const word = e.target.word.value.toLowerCase();
     if (allWords.includes(word)) {
       setErrorMsg('Word already guessed. Guess a different word.');
     } else {
-      socket.emit('word', { word, gameId: currentGame.id, userId });
+      console.log(currentGame);
+      socket.emit('word', { word, gameId: currentGame.id, userId, refId: currentGame.ref });
       setErrorMsg(undefined);
     }
     e.target.word.value = '';
@@ -104,11 +111,17 @@ function App() {
 
   const reset = (e) => {
     e.preventDefault();
-    socket.emit('reset', currentGame.id);
+    console.log(currentGame)
+    socket.emit('reset', currentGame);
     setGameWon(false);
   }
 
-  const currentUser = useMemo(() => currentGame?.users.find(user => user.id === userId) ?? {}, [currentGame])
+  const removePlayer = (playerId) => {
+    socket.emit('removePlayer', playerId);
+
+  }
+
+  const currentUser = useMemo(() => currentGame?.users[userId] ?? {}, [currentGame])
 
   return (
     <div className='container'>
@@ -126,10 +139,10 @@ function App() {
         <Intro createGame={createGame} joinGame={joinGame} />
       ) : (
           <div>
-            <div className="users">{currentGame.users.map(user => {
+            <div className="users">{Object.values(currentGame.users).map(user => {
               return (
                 <Card key={user.id} className="user">
-                  <Card.Header variant="dark">{user.name}</Card.Header>
+                  <Card.Header variant="dark">{user.name} {currentUser?.isHost && <button onClick={() => removePlayer(user.id)}>x</button>}</Card.Header>
                   <ListGroup variant="flush">
                     {user.words.map((word, index) => {
                       const listItem = index === userTyping - 1 ? '✔' : word;
@@ -144,7 +157,7 @@ function App() {
             <Form onSubmit={sendWord}>
               <Form.Group className="mb-3 d-flex align-items-center" controlId="word">
                 <Form.Control as="input" rows={3} placeholder="Guess" />
-                <Button type="submit" disabled={(currentGame.users.length === 1 || currentUser.words.length === userTyping)}>Send</Button>
+                <Button type="submit" disabled={(Object.values(currentGame.users).length === 1 || currentUser.words.length === userTyping)}>Send</Button>
               </Form.Group>
             </Form>
             }
@@ -160,7 +173,7 @@ function Intro({ createGame, joinGame }) {
       <Form>
         <Form.Group className="mb-3" controlId="name">
           <Form.Label>Name:</Form.Label>
-          <Form.Control as="input" rows={3} />
+          <Form.Control as="input" rows={3} maxLength={12} />
         </Form.Group>
         <Form.Group className="mb-3" controlId="code">
           <Form.Label>Code:</Form.Label>

@@ -1,9 +1,17 @@
-const express = require('express');
+import { addWordToUserList, createGame, resetUserList, joinGame, removePlayer, removeRoom } from './firebase.js';
+
+import express from 'express';
+import http from 'http';
+import path from 'path';
+import { Server } from 'socket.io';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const http = require('http');
-const path = require('path');
 const server = http.createServer(app);
-const { Server } = require("socket.io");
 const io = new Server(server);
 
 app.use(express.static(path.resolve(__dirname, './build')));
@@ -22,80 +30,116 @@ app.get('/api/game/:gameId', (req, res) => {
 //     console.log('gameid', req)
 //   });
 
-const db = {
-    test: {
-        users: [{
-            name: 'user1',
-            id: 1234,
-            words: ['apple', 'banana']
-        }, {
-            name: 'user2',
-            id: 1235,
-            words: ['plane', 'lime']
-        }],
-        isComplete: false,
-        id: 1
-    }
-};
+// const db = {
+//     test: {
+//         users: [{
+//             name: 'user1',
+//             id: 1234,
+//             words: ['apple', 'banana']
+//         }, {
+//             name: 'user2',
+//             id: 1235,
+//             words: ['plane', 'lime']
+//         }],
+//         isComplete: false,
+//         id: 1
+//     }
+// };
+
+const getGameIdFromSocket = (socketId) => socketId.slice(0, 4).toUpperCase();
 
 io.on('connection', (socket) => {
   console.log('a user connected');
 
-    socket.on('create', (gameId, userInfo) => {
-        if (db[gameId]) {
-            io.emit('error', 'Game already exists');
-        } else {
-            db[gameId] = {
-                users: [userInfo],
-                id: gameId
-            };
+    socket.on('create', async (userInfo) => {
+        const gameId = getGameIdFromSocket(socket.id);
+        const game = await createGame(gameId, userInfo);
+
+        if (game.exists()) {
+            socket.data = { userInfo, gameId, ref: game.id };
             socket.join(gameId);
-            io.to(gameId).emit('currentGame', db[gameId]);
+            socket.emit('currentGame', {
+                ref: game.id,
+                ...game.data()
+            });
+        } else {
+            io.to(socket.id).emit('error', `Game failed to create. Code: ${gameId}`);
         }
     })
 
-    socket.on('game', (gameId, userInfo) => {
-        if (!db[gameId]) {
-            io.emit('error', 'Game does not exist');
-        } else {
-            const existingUser = db[gameId].users.find(user => user.name === userInfo.name);
-            if (!existingUser) {
-                db[gameId].users.push(userInfo)
-            } else {
-                existingUser.id = userInfo.id;
-            }
-            socket.emit('currentGame', db[gameId])
+    socket.on('game', async (gameId, userInfo) => {
+        try {
+            const updatedDoc = await joinGame(gameId, userInfo);
+            socket.data = { userInfo, gameId, ref: updatedDoc.id };
+
             socket.join(gameId);
-            io.to(gameId).emit('currentGame', db[gameId]);
+            io.to(gameId).emit('currentGame', {
+                ref: updatedDoc.id,
+                ...updatedDoc.data()
+            });
+        } catch (err) {
+            console.log(err)
+            io.to(socket.id).emit('error', 'Game does not exist');
         }
     });
 
-    socket.on('word', ({ word, gameId, userId }) => {
-        if (!db[gameId]) {
-            console.warn('no game found for gameId: ', gameId)
-            return;
+    socket.on('word', async ({ word }) => {
+        try {
+            const { userInfo: { id: userId }, ref: refId, gameId } = socket.data;
+            const updatedDoc = await addWordToUserList(userId, refId, word);
+
+            io.to(gameId).emit('currentGame', {
+                ref: updatedDoc.id,
+                ...updatedDoc.data()
+            });
+
+        } catch (err) {
+            io.to(socket.id).emit('error', err);
         }
-        const user = db[gameId]?.users.find(user => user.id === userId);
-        user.words.push(word);
-        socket.emit('currentGame', db[gameId]);
-        io.to(gameId).emit('currentGame', db[gameId]);
+
     })
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
+        const { gameId, userInfo, ref } = socket.data;
+
+        const clients = io.sockets.adapter.rooms.get(gameId);
+        const numClients = clients?.size ?? 0;
+
+        if (numClients < 1) {
+            await removeRoom(ref);
+        }
+
+        io.to(gameId).emit('error', ` ${userInfo?.name ?? 'Someone'} has disconnected.`);
         console.log(reason, "disconnected");
     })
 
-    socket.on('reset', (gameId) => {
-        db[gameId].users = db[gameId].users.map(user => ({
-            ...user,
-            words: []
-        }));
-        socket.emit('currentGame', db[gameId]);
-        socket.broadcast.emit('currentGame', db[gameId]);
+    socket.on('reset', async ({ id }) => {
+        try {
+            const { ref } = socket.data;
+            const game = await resetUserList(ref);
+            io.to(id).emit('currentGame', {
+                ref: game.id,
+                ...game.data()
+            });
+        } catch (err) {
+            console.error(err);
+            io.to(id).emit('error', err)
+        }
+    })
+
+    socket.on('removePlayer', async (playerId) => {
+        const { gameId, ref } = socket.data;
+        const updatedDoc = await removePlayer(playerId, ref, gameId);
+
+        io.to(gameId).emit('currentGame', {
+            ref: updatedDoc.id,
+            ...updatedDoc.data()
+        });
     })
 });
 
-const port = process.env.PORT || 3001;
+
+const port = process.env.PORT || 3000;
 
 server.listen(port, () => {
   console.log('listening on *:', port);
